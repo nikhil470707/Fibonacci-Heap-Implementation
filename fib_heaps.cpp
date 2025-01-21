@@ -2,6 +2,8 @@
 #include <cmath>
 #include <memory>
 #include <vector>
+#include <limits>
+
 using namespace std;
 
 class FibonacciHeap {
@@ -15,27 +17,24 @@ private:
         Node* parent;
         Node* child;
         bool mark;
-        bool visited;
 
         Node(int k) : key(k), degree(0), left_sibling(this), right_sibling(this),
-                     parent(nullptr), child(nullptr), mark(false), visited(false) {}
+                      parent(nullptr), child(nullptr), mark(false) {}
     };
 
     int n;
     Node* min;
-    int phi;
-    int degree;
 
     void consolidate();
     void fib_heap_link(Node* y, Node* x);
-    void cut(Node* node_to_be_decrease, Node* parent_node);
+    void cut(Node* node_to_be_decreased, Node* parent_node);
     void cascading_cut(Node* parent_node);
-    void find_node(Node* n, int key, int new_key);
+    void find_and_decrease_key(Node* n, int old_key, int new_key);
     int calculate_degree(int n) const;
     void print_heap_recursive(Node* n) const;
 
 public:
-    FibonacciHeap() : n(0), min(nullptr), phi(0), degree(0) {}
+    FibonacciHeap() : n(0), min(nullptr) {}
     ~FibonacciHeap();
 
     void insert(int val);
@@ -72,7 +71,7 @@ void FibonacciHeap::cleanup(Node* node) {
 
 void FibonacciHeap::insert(int val) {
     Node* new_node = new Node(val);
-    
+
     if (!min) {
         min = new_node;
     } else {
@@ -80,7 +79,7 @@ void FibonacciHeap::insert(int val) {
         new_node->right_sibling = min;
         new_node->left_sibling = min->left_sibling;
         min->left_sibling = new_node;
-        
+
         if (new_node->key < min->key) {
             min = new_node;
         }
@@ -228,22 +227,23 @@ FibonacciHeap::Node* FibonacciHeap::extract_min() {
     }
 
     n--;
+    cout << "Extracted minimum: " << temp->key << endl; // Print the extracted minimum
     return temp;
 }
 
 void FibonacciHeap::decrease_key(int old_key, int new_key) {
     if (min) {
-        find_node(min, old_key, new_key);
+        find_and_decrease_key(min, old_key, new_key);
     }
 }
 
-void FibonacciHeap::find_node(Node* n, int key, int new_key) {
+void FibonacciHeap::find_and_decrease_key(Node* n, int old_key, int new_key) {
     if (!n) return;
 
     Node* current = n;
     do {
-        if (current->key == key) {
-            if (current->key < new_key) {
+        if (current->key == old_key) {
+            if (new_key > old_key) {
                 throw runtime_error("New key is greater than current key");
             }
             current->key = new_key;
@@ -258,30 +258,30 @@ void FibonacciHeap::find_node(Node* n, int key, int new_key) {
             return;
         }
         if (current->child) {
-            find_node(current->child, key, new_key);
+            find_and_decrease_key(current->child, old_key, new_key);
         }
         current = current->right_sibling;
     } while (current != n);
 }
 
-void FibonacciHeap::cut(Node* node_to_be_decrease, Node* parent_node) {
-    if (node_to_be_decrease == node_to_be_decrease->right_sibling) {
+void FibonacciHeap::cut(Node* node_to_be_decreased, Node* parent_node) {
+    if (node_to_be_decreased == node_to_be_decreased->right_sibling) {
         parent_node->child = nullptr;
     } else {
-        node_to_be_decrease->left_sibling->right_sibling = node_to_be_decrease->right_sibling;
-        node_to_be_decrease->right_sibling->left_sibling = node_to_be_decrease->left_sibling;
-        if (node_to_be_decrease == parent_node->child) {
-            parent_node->child = node_to_be_decrease->right_sibling;
+        node_to_be_decreased->left_sibling->right_sibling = node_to_be_decreased->right_sibling;
+        node_to_be_decreased->right_sibling->left_sibling = node_to_be_decreased->left_sibling;
+        if (node_to_be_decreased == parent_node->child) {
+            parent_node->child = node_to_be_decreased->right_sibling;
         }
     }
 
     parent_node->degree--;
-    node_to_be_decrease->right_sibling = min;
-    node_to_be_decrease->left_sibling = min->left_sibling;
-    min->left_sibling->right_sibling = node_to_be_decrease;
-    min->left_sibling = node_to_be_decrease;
-    node_to_be_decrease->parent = nullptr;
-    node_to_be_decrease->mark = false;
+    node_to_be_decreased->right_sibling = min;
+    node_to_be_decreased->left_sibling = min->left_sibling;
+    min->left_sibling->right_sibling = node_to_be_decreased;
+    min->left_sibling = node_to_be_decreased;
+    node_to_be_decreased->parent = nullptr;
+    node_to_be_decreased->mark = false;
 }
 
 void FibonacciHeap::cascading_cut(Node* parent_node) {
@@ -326,62 +326,93 @@ void FibonacciHeap::union_with(FibonacciHeap& other) {
 
 int main() {
     FibonacciHeap heap;
-    
-    int no_of_nodes;
-    cout << "Enter number of nodes to insert: ";
-    cin >> no_of_nodes;
-    
-    for (int i = 1; i <= no_of_nodes; i++) {
-        int ele;
-        cout << "\nNode " << i << " and its key value: ";
-        cin >> ele;
-        heap.insert(ele);
-    }
-    
-    try {
-        cout << "\nMinimum value: " << heap.find_min() << endl;
-        
-        FibonacciHeap heap2;
-        cout << "\nCreating second heap for union operation..." << endl;
-        cout << "Enter number of nodes for second heap: ";
-        cin >> no_of_nodes;
-        
-        for (int i = 1; i <= no_of_nodes; i++) {
-            int ele;
-            cout << "Node " << i << " and its key value: ";
-            cin >> ele;
-            heap2.insert(ele);
+    FibonacciHeap heap2;
+
+    int choice;
+    do {
+        cout << "\nMenu:" << endl;
+        cout << "1. Insert into Heap" << endl;
+        cout << "2. Find Minimum" << endl;
+        cout << "3. Extract Minimum" << endl;
+        cout << "4. Decrease Key" << endl;
+        cout << "5. Delete Node" << endl;
+        cout << "6. Union Heaps" << endl;
+        cout << "7. Print Heap" << endl;
+        cout << "8. Exit" << endl;
+        cout << "Enter your choice: ";
+        cin >> choice;
+
+        switch (choice) {
+        case 1: {
+            int val;
+            cout << "Enter value to insert: ";
+            cin >> val;
+            heap.insert(val);
+            break;
         }
-        
-        heap.union_with(heap2);
-        cout << "\nUnified Heap:" << endl;
-        heap.print_heap();
-        
-        heap.extract_min();
-        cout << "\nAfter extracting minimum:" << endl;
-        heap.print_heap();
-        
-        int dec_key, new_key;
-        cout << "\nEnter key to decrease: ";
-        cin >> dec_key;
-        cout << "Enter new key value: ";
-        cin >> new_key;
-        heap.decrease_key(dec_key, new_key);
-        
-        cout << "\nAfter decreasing key:" << endl;
-        heap.print_heap();
-        
-        int del_key;
-        cout << "\nEnter key to delete: ";
-        cin >> del_key;
-        heap.delete_node(del_key);
-        
-        cout << "\nAfter deleting node:" << endl;
-        heap.print_heap();
-        
-    } catch (const exception& e) {
-        cout << "Error: " << e.what() << endl;
-    }
-    
+        case 2:
+            try {
+                cout << "Minimum value: " << heap.find_min() << endl;
+            } catch (const exception& e) {
+                cout << "Error: " << e.what() << endl;
+            }
+            break;
+        case 3:
+            try {
+                heap.extract_min();
+            } catch (const exception& e) {
+                cout << "Error: " << e.what() << endl;
+            }
+            break;
+        case 4: {
+            int old_key, new_key;
+            cout << "Enter key to decrease: ";
+            cin >> old_key;
+            cout << "Enter new key value: ";
+            cin >> new_key;
+            try {
+                heap.decrease_key(old_key, new_key);
+            } catch (const exception& e) {
+                cout << "Error: " << e.what() << endl;
+            }
+            break;
+        }
+        case 5: {
+            int del_key;
+            cout << "Enter key to delete: ";
+            cin >> del_key;
+            try {
+                heap.delete_node(del_key);
+            } catch (const exception& e) {
+                cout << "Error: " << e.what() << endl;
+            }
+            break;
+        }
+        case 6:
+            cout << "\nEnter number of nodes for second heap: ";
+            int no_of_nodes;
+            cin >> no_of_nodes;
+            for (int i = 1; i <= no_of_nodes; i++) {
+                int ele;
+                cout << "Node " << i << " and its key value: ";
+                cin >> ele;
+                heap2.insert(ele);
+            }
+            heap.union_with(heap2);
+            cout << "Heaps united." << endl;
+            break;
+        case 7:
+            cout << "Heap contents:" << endl;
+            heap.print_heap();
+            break;
+        case 8:
+            cout << "Exiting program." << endl;
+            break;
+        default:
+            cout << "Invalid choice. Please try again." << endl;
+        }
+
+    } while (choice != 8);
+
     return 0;
 }
